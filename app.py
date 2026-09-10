@@ -61,7 +61,7 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
         grand_total = supply_total + vat_total
     else:
         vat_total = 0
-        grand_total = supply_total
+        grand_total = supply_total  # VAT 별도 선택 시 최종 토탈 = 공급가액 총액
         
     return adjusted_items, supply_total, vat_total, grand_total
 
@@ -150,9 +150,9 @@ st.markdown("---")
 st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 단위 절삭 적용")
 p_col1, p_col2, p_col3 = st.columns(3)
 
-p_col1.metric("본견적서 총액", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
-p_col2.metric(f"가견적서 (+{ga_rate}%) 총액", f"{grand_ga:,} 원", f"공급가액: {supply_ga:,}원 | 부가세: {vat_ga:,}원")
-p_col3.metric(f"타견적서 (+{ta_rate}%) 총액", f"{grand_ta:,} 원", f"공급가액: {supply_ta:,}원 | 부가세: {vat_ta:,}원")
+p_col1.metric("본견적서 최종 총액", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
+p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 총액", f"{grand_ga:,} 원", f"공급가액: {supply_ga:,}원 | 부가세: {vat_ga:,}원")
+p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 총액", f"{grand_ta:,} 원", f"공급가액: {supply_ta:,}원 | 부가세: {vat_ta:,}원")
 
 # ---------------------------------------------------------
 # Excel Generation Logic
@@ -180,8 +180,8 @@ def generate_excel():
             ws.cell(row=r, column=9, value=bon_amts[idx]) # 만 원 단위 절삭된 본견적 금액
             ws.cell(row=r, column=10, value=item["note"])
             
-        ws.cell(row=41, column=9, value=vat_bon)  # 부가세
-        ws.cell(row=42, column=9, value=grand_bon) # 계
+        ws.cell(row=41, column=9, value=vat_bon)   # 부가세 (미포함 시 0)
+        ws.cell(row=42, column=9, value=grand_bon) # 계 (미포함 시 공급가액 합계)
         ws["D21"] = num2kor(grand_bon)
 
     # 2. 가견적서 작성 (시트 2)
@@ -203,8 +203,8 @@ def generate_excel():
             ws.cell(row=r, column=9, value=ga_amts[idx]) # 만 원 단위 절삭된 품목 금액
             ws.cell(row=r, column=10, value=item["note"])
             
-        ws.cell(row=41, column=9, value=vat_ga)  # 부가세
-        ws.cell(row=42, column=9, value=grand_ga) # 계
+        ws.cell(row=41, column=9, value=vat_ga)   # 부가세 (미포함 시 0)
+        ws.cell(row=42, column=9, value=grand_ga) # 계 (미포함 시 공급가액 합계)
         ws["D21"] = num2kor(grand_ga)
 
     # 3. 타견적서 작성 (시트 3)
@@ -230,9 +230,9 @@ def generate_excel():
             ws.cell(row=r, column=8, value=vat_price)     # 세액 (H열)
             ws.cell(row=r, column=9, value=item["note"])
             
-        ws.cell(row=38, column=7, value=supply_ta)
-        ws.cell(row=39, column=7, value=vat_ta)
-        ws.cell(row=40, column=7, value=grand_ta)
+        ws.cell(row=38, column=7, value=supply_ta) # 공급가액 합계
+        ws.cell(row=39, column=7, value=vat_ta)    # 부가가치세 합계 (미포함 시 0)
+        ws.cell(row=40, column=7, value=grand_ta)  # 최종 합계 (미포함 시 공급가액 합계)
         ws["D17"] = num2kor(grand_ta)
 
     output = io.BytesIO()
