@@ -61,7 +61,7 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
         grand_total = supply_total + vat_total
     else:
         vat_total = 0
-        grand_total = supply_total  # VAT 별도 선택 시 최종 토탈 = 공급가액 총액
+        grand_total = supply_total  # VAT 별도 선택 시 최종 금액 = 공급가액 총액
         
     return adjusted_items, supply_total, vat_total, grand_total
 
