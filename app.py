@@ -61,7 +61,7 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
         grand_total = supply_total + vat_total
     else:
         vat_total = 0
-        grand_total = supply_total  # VAT 별도 선택 시 최종 금액 = 공급가액 총액
+        grand_total = supply_total  # VAT 별도 선택 시 최종 금액 = 순수 공급가액
         
     return adjusted_items, supply_total, vat_total, grand_total
 
@@ -89,7 +89,9 @@ include_vat_option = st.radio(
     index=0,
     horizontal=True
 )
-include_vat = True if "포함" in include_vat_option else False
+
+# ★ 조건식 수정: "VAT 포함"으로 시작하는 경우에만 True로 처리
+include_vat = include_vat_option.startswith("VAT 포함")
 
 st.divider()
 
