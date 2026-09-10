@@ -150,9 +150,9 @@ st.markdown("---")
 st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 단위 절삭 적용")
 p_col1, p_col2, p_col3 = st.columns(3)
 
-p_col1.metric("본견적서 최종 총액", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
-p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 총액", f"{grand_ga:,} 원", f"공급가액: {supply_ga:,}원 | 부가세: {vat_ga:,}원")
-p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 총액", f"{grand_ta:,} 원", f"공급가액: {supply_ta:,}원 | 부가세: {vat_ta:,}원")
+p_col1.metric("본견적서 최종 금액", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
+p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 금액", f"{grand_ga:,} 원", f"공급가액: {supply_ga:,}원 | 부가세: {vat_ga:,}원")
+p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 금액", f"{grand_ta:,} 원", f"공급가액: {supply_ta:,}원 | 부가세: {vat_ta:,}원")
 
 # ---------------------------------------------------------
 # Excel Generation Logic
