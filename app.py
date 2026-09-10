@@ -37,10 +37,10 @@ def num2kor(num):
         
     return "".join(reversed(result))
 
-def calculate_quote(items, rate, cut_unit=10000):
+def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
     """
-    품목 리스트와 인상률(%)을 받아 
-    각 개별 품목 금액(공급가액)부터 cut_unit(기본 만 원) 단위로 절삭(버림) 처리
+    품목 리스트와 인상률(%)을 받아
+    개별 품목 금액부터 cut_unit(만 원) 단위로 절삭 처리
     """
     if not items:
         return [], 0, 0, 0
@@ -55,15 +55,20 @@ def calculate_quote(items, rate, cut_unit=10000):
         adjusted_items.append(adj_amt)
         
     supply_total = sum(adjusted_items)
-    vat_total = int(round(supply_total * 0.1))
-    grand_total = supply_total + vat_total
+    
+    if include_vat:
+        vat_total = int(round(supply_total * 0.1))
+        grand_total = supply_total + vat_total
+    else:
+        vat_total = 0
+        grand_total = supply_total
         
     return adjusted_items, supply_total, vat_total, grand_total
 
 # ---------------------------------------------------------
 # Sidebar Settings
 # ---------------------------------------------------------
-st.sidebar.header("⚙️ 인상률 및 절삭 설정")
+st.sidebar.header("⚙️ 상세 설정")
 ga_rate = st.sidebar.number_input("가견적서 인상률 (%)", value=5.0, step=1.0)
 ta_rate = st.sidebar.number_input("타견적서 인상률 (%)", value=10.0, step=1.0)
 
@@ -75,8 +80,19 @@ cut_option = st.sidebar.selectbox(
 )
 
 # ---------------------------------------------------------
-# Form Inputs
+# Main Options & Form Inputs
 # ---------------------------------------------------------
+st.subheader("⚙️ VAT 적용 옵션 선택")
+include_vat_option = st.radio(
+    "VAT(부가가치세) 계산 방식을 선택하세요:",
+    options=["VAT 포함 (공급가액 + 10% 부가세 자동 합산)", "VAT 별도/미포함 (부가세 계산 안 함)"],
+    index=0,
+    horizontal=True
+)
+include_vat = True if "포함" in include_vat_option else False
+
+st.divider()
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -124,15 +140,17 @@ st.button("➕ 항목 추가", on_click=add_item)
 # ---------------------------------------------------------
 # Calculations & Preview
 # ---------------------------------------------------------
-bon_amts, supply_bon, vat_bon, grand_bon = calculate_quote(st.session_state["items"], 0, cut_unit=1)
-ga_amts, supply_ga, vat_ga, grand_ga = calculate_quote(st.session_state["items"], ga_rate, cut_unit=cut_option)
-ta_amts, supply_ta, vat_ta, grand_ta = calculate_quote(st.session_state["items"], ta_rate, cut_unit=cut_option)
+bon_amts, supply_bon, vat_bon, grand_bon = calculate_quote(st.session_state["items"], 0, include_vat=include_vat, cut_unit=cut_option)
+ga_amts, supply_ga, vat_ga, grand_ga = calculate_quote(st.session_state["items"], ga_rate, include_vat=include_vat, cut_unit=cut_option)
+ta_amts, supply_ta, vat_ta, grand_ta = calculate_quote(st.session_state["items"], ta_rate, include_vat=include_vat, cut_unit=cut_option)
+
+vat_str = "(VAT 포함)" if include_vat else "(VAT 별도)"
 
 st.markdown("---")
-st.subheader("📊 견적 금액 미리보기 (품목별 만 원 단위 절삭 적용)")
+st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 단위 절삭 적용")
 p_col1, p_col2, p_col3 = st.columns(3)
 
-p_col1.metric("본견적서 총액(VAT포함)", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
+p_col1.metric("본견적서 총액", f"{grand_bon:,} 원", f"공급가액: {supply_bon:,}원 | 부가세: {vat_bon:,}원")
 p_col2.metric(f"가견적서 (+{ga_rate}%) 총액", f"{grand_ga:,} 원", f"공급가액: {supply_ga:,}원 | 부가세: {vat_ga:,}원")
 p_col3.metric(f"타견적서 (+{ta_rate}%) 총액", f"{grand_ta:,} 원", f"공급가액: {supply_ta:,}원 | 부가세: {vat_ta:,}원")
 
@@ -151,6 +169,7 @@ def generate_excel():
         ws["D14"] = issue_date.strftime("%Y-%m-%d")
         ws["I14"] = manager_name
         ws["D18"] = project_name
+        ws["G21"] = "(부가세 포함)" if include_vat else "(부가세 별도)"
         
         start_row = 26
         for idx, item in enumerate(st.session_state["items"]):
@@ -158,11 +177,11 @@ def generate_excel():
             ws.cell(row=r, column=3, value=item["category"])
             ws.cell(row=r, column=4, value=item["detail"])
             ws.cell(row=r, column=5, value=item["spec"])
-            ws.cell(row=r, column=9, value=item["amount"])
+            ws.cell(row=r, column=9, value=bon_amts[idx]) # 만 원 단위 절삭된 본견적 금액
             ws.cell(row=r, column=10, value=item["note"])
             
-        ws.cell(row=41, column=9, value=vat_bon)  # 부가세 (금액 합계 * 0.1)
-        ws.cell(row=42, column=9, value=grand_bon) # 계 (공급가액 + 부가세)
+        ws.cell(row=41, column=9, value=vat_bon)  # 부가세
+        ws.cell(row=42, column=9, value=grand_bon) # 계
         ws["D21"] = num2kor(grand_bon)
 
     # 2. 가견적서 작성 (시트 2)
@@ -173,6 +192,7 @@ def generate_excel():
         ws["D14"] = issue_date.strftime("%Y-%m-%d")
         ws["I14"] = manager_name
         ws["D18"] = project_name
+        ws["G21"] = "(부가세 포함)" if include_vat else "(부가세 별도)"
         
         start_row = 26
         for idx, item in enumerate(st.session_state["items"]):
@@ -183,8 +203,8 @@ def generate_excel():
             ws.cell(row=r, column=9, value=ga_amts[idx]) # 만 원 단위 절삭된 품목 금액
             ws.cell(row=r, column=10, value=item["note"])
             
-        ws.cell(row=41, column=9, value=vat_ga)  # 부가세 (공급가액 합계 * 0.1)
-        ws.cell(row=42, column=9, value=grand_ga) # 계 (공급가액 + 부가세)
+        ws.cell(row=41, column=9, value=vat_ga)  # 부가세
+        ws.cell(row=42, column=9, value=grand_ga) # 계
         ws["D21"] = num2kor(grand_ga)
 
     # 3. 타견적서 작성 (시트 3)
@@ -201,13 +221,13 @@ def generate_excel():
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
             supply_price = ta_amts[idx]                # 만 원 단위 절삭된 품목 공급가액
-            vat_price = int(round(supply_price * 0.1)) # 세액 = 공급가액 * 0.1
+            vat_price = int(round(supply_price * 0.1)) if include_vat else 0 # 세액
             
             ws.cell(row=r, column=3, value=idx + 1)
             ws.cell(row=r, column=4, value=f"[{item['category']}] {item['detail']}")
             ws.cell(row=r, column=5, value=item["spec"])
             ws.cell(row=r, column=7, value=supply_price) # 공급가액 (G열)
-            ws.cell(row=r, column=8, value=vat_price)     # 세액 (H열 = 공급가액 * 0.1)
+            ws.cell(row=r, column=8, value=vat_price)     # 세액 (H열)
             ws.cell(row=r, column=9, value=item["note"])
             
         ws.cell(row=38, column=7, value=supply_ta)
