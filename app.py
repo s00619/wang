@@ -65,6 +65,17 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
         
     return adjusted_items, supply_total, vat_total, grand_total
 
+def safe_write_cell(ws, row, col, value):
+    """병합 셀 에러 방지를 위한 안전한 값 입력 함수"""
+    cell = ws.cell(row=row, column=col)
+    if type(cell).__name__ == 'MergedCell':
+        for rng in ws.merged_cells.ranges:
+            if cell.coordinate in rng:
+                ws.cell(row=rng.min_row, column=rng.min_col, value=value)
+                return
+    else:
+        cell.value = value
+
 # ---------------------------------------------------------
 # Sidebar Settings
 # ---------------------------------------------------------
@@ -90,7 +101,6 @@ include_vat_option = st.radio(
     horizontal=True
 )
 
-# ★ 조건식 수정: "VAT 포함"으로 시작하는 경우에만 True로 처리
 include_vat = include_vat_option.startswith("VAT 포함")
 
 st.divider()
@@ -166,76 +176,76 @@ def generate_excel():
     # 1. 본견적서 작성 (시트 1)
     if "본견적서" in wb.sheetnames:
         ws = wb["본견적서"]
-        ws["C7"] = client_name    # "귀하" 바로 왼쪽 셀
-        ws["D12"] = client_name   # 발주처 정보
-        ws["D14"] = issue_date.strftime("%Y-%m-%d")
-        ws["I14"] = manager_name
-        ws["D18"] = project_name
-        ws["G21"] = "(부가세 포함)" if include_vat else "(부가세 별도)"
+        safe_write_cell(ws, 7, 3, client_name)
+        safe_write_cell(ws, 12, 4, client_name)
+        safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 14, 9, manager_name)
+        safe_write_cell(ws, 18, 4, project_name)
+        safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
         
         start_row = 26
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            ws.cell(row=r, column=3, value=item["category"])
-            ws.cell(row=r, column=4, value=item["detail"])
-            ws.cell(row=r, column=5, value=item["spec"])
-            ws.cell(row=r, column=9, value=bon_amts[idx]) # 만 원 단위 절삭된 본견적 금액
-            ws.cell(row=r, column=10, value=item["note"])
+            safe_write_cell(ws, r, 3, item["category"])
+            safe_write_cell(ws, r, 4, item["detail"])
+            safe_write_cell(ws, r, 5, item["spec"])
+            safe_write_cell(ws, r, 9, bon_amts[idx])
+            safe_write_cell(ws, r, 10, item["note"])
             
-        ws.cell(row=41, column=9, value=vat_bon)   # 부가세 (미포함 시 0)
-        ws.cell(row=42, column=9, value=grand_bon) # 계 (미포함 시 공급가액 합계)
-        ws["D21"] = num2kor(grand_bon)
+        safe_write_cell(ws, 41, 9, vat_bon)
+        safe_write_cell(ws, 42, 9, grand_bon)
+        safe_write_cell(ws, 21, 4, num2kor(grand_bon))
 
     # 2. 가견적서 작성 (시트 2)
     if "가견적서(본견+5%)" in wb.sheetnames:
         ws = wb["가견적서(본견+5%)"]
-        ws["C7"] = client_name    # "귀하" 바로 왼쪽 셀
-        ws["D12"] = client_name   # 발주처 정보
-        ws["D14"] = issue_date.strftime("%Y-%m-%d")
-        ws["I14"] = manager_name
-        ws["D18"] = project_name
-        ws["G21"] = "(부가세 포함)" if include_vat else "(부가세 별도)"
+        safe_write_cell(ws, 7, 3, client_name)
+        safe_write_cell(ws, 12, 4, client_name)
+        safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 14, 9, manager_name)
+        safe_write_cell(ws, 18, 4, project_name)
+        safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
         
         start_row = 26
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            ws.cell(row=r, column=3, value=item["category"])
-            ws.cell(row=r, column=4, value=item["detail"])
-            ws.cell(row=r, column=5, value=item["spec"])
-            ws.cell(row=r, column=9, value=ga_amts[idx]) # 만 원 단위 절삭된 품목 금액
-            ws.cell(row=r, column=10, value=item["note"])
+            safe_write_cell(ws, r, 3, item["category"])
+            safe_write_cell(ws, r, 4, item["detail"])
+            safe_write_cell(ws, r, 5, item["spec"])
+            safe_write_cell(ws, r, 9, ga_amts[idx])
+            safe_write_cell(ws, r, 10, item["note"])
             
-        ws.cell(row=41, column=9, value=vat_ga)   # 부가세 (미포함 시 0)
-        ws.cell(row=42, column=9, value=grand_ga) # 계 (미포함 시 공급가액 합계)
-        ws["D21"] = num2kor(grand_ga)
+        safe_write_cell(ws, 41, 9, vat_ga)
+        safe_write_cell(ws, 42, 9, grand_ga)
+        safe_write_cell(ws, 21, 4, num2kor(grand_ga))
 
     # 3. 타견적서 작성 (시트 3)
     if "타견적서(본견+10%)" in wb.sheetnames:
         ws = wb["타견적서(본견+10%)"]
-        ws["D3"] = None           # D3 셀 문구 제거
-        ws["C7"] = client_name    # "귀하" 바로 왼쪽 셀
-        ws["D10"] = client_name   # 발주처 정보
-        ws["D12"] = issue_date.strftime("%Y-%m-%d")
-        ws["I12"] = manager_name
-        ws["D18"] = project_name
+        safe_write_cell(ws, 3, 4, None)
+        safe_write_cell(ws, 7, 3, client_name)
+        safe_write_cell(ws, 10, 4, client_name)
+        safe_write_cell(ws, 12, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 12, 9, manager_name)
+        safe_write_cell(ws, 18, 4, project_name)
         
         start_row = 23
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            supply_price = ta_amts[idx]                # 만 원 단위 절삭된 품목 공급가액
-            vat_price = int(round(supply_price * 0.1)) if include_vat else 0 # 세액
+            supply_price = ta_amts[idx]
+            vat_price = int(round(supply_price * 0.1)) if include_vat else 0
             
-            ws.cell(row=r, column=3, value=idx + 1)
-            ws.cell(row=r, column=4, value=f"[{item['category']}] {item['detail']}")
-            ws.cell(row=r, column=5, value=item["spec"])
-            ws.cell(row=r, column=7, value=supply_price) # 공급가액 (G열)
-            ws.cell(row=r, column=8, value=vat_price)     # 세액 (H열)
-            ws.cell(row=r, column=9, value=item["note"])
+            safe_write_cell(ws, r, 3, idx + 1)
+            safe_write_cell(ws, r, 4, f"[{item['category']}] {item['detail']}")
+            safe_write_cell(ws, r, 5, item["spec"])
+            safe_write_cell(ws, r, 7, supply_price)
+            safe_write_cell(ws, r, 8, vat_price)
+            safe_write_cell(ws, r, 9, item["note"])
             
-        ws.cell(row=38, column=7, value=supply_ta) # 공급가액 합계
-        ws.cell(row=39, column=7, value=vat_ta)    # 부가가치세 합계 (미포함 시 0)
-        ws.cell(row=40, column=7, value=grand_ta)  # 최종 합계 (미포함 시 공급가액 합계)
-        ws["D17"] = num2kor(grand_ta)
+        safe_write_cell(ws, 38, 7, supply_ta)
+        safe_write_cell(ws, 39, 7, vat_ta)
+        safe_write_cell(ws, 40, 7, grand_ta)
+        safe_write_cell(ws, 17, 4, num2kor(grand_ta))
 
     output = io.BytesIO()
     wb.save(output)
