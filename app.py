@@ -39,8 +39,8 @@ def num2kor(num):
 
 def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
     """
-    품목 리스트와 인상률(%)을 받아
-    개별 품목 금액부터 cut_unit(만 원) 단위로 절삭 처리
+    품목 리스트, 부가세 계산 및 총액까지 
+    모든 단계에서 cut_unit(기본 10,000원) 미만 단수를 버림(절삭) 처리
     """
     if not items:
         return [], 0, 0, 0
@@ -57,11 +57,16 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
     supply_total = sum(adjusted_items)
     
     if include_vat:
-        vat_total = int(round(supply_total * 0.1))
+        raw_vat = supply_total * 0.1
+        # 부가세 자체도 만 원 단위 미만 절삭(버림)
+        if cut_unit > 1:
+            vat_total = int((raw_vat // cut_unit) * cut_unit)
+        else:
+            vat_total = int(round(raw_vat))
         grand_total = supply_total + vat_total
     else:
         vat_total = 0
-        grand_total = supply_total  # VAT 별도 선택 시 최종 금액 = 순수 공급가액
+        grand_total = supply_total
         
     return adjusted_items, supply_total, vat_total, grand_total
 
@@ -84,7 +89,7 @@ ga_rate = st.sidebar.number_input("가견적서 인상률 (%)", value=5.0, step=
 ta_rate = st.sidebar.number_input("타견적서 인상률 (%)", value=10.0, step=1.0)
 
 cut_option = st.sidebar.selectbox(
-    "품목 금액 절삭(버림) 단위",
+    "품목 금액 및 부가세 절삭(버림) 단위",
     options=[10000, 1000, 100, 1],
     index=0, # 만 원 단위 기본 선택
     format_func=lambda x: "만 원 단위 절삭 (기본)" if x == 10000 else ("천 원 단위 절삭" if x == 1000 else ("백 원 단위 절삭" if x == 100 else "절삭 없음"))
@@ -233,7 +238,7 @@ def generate_excel():
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
             supply_price = ta_amts[idx]
-            vat_price = int(round(supply_price * 0.1)) if include_vat else 0
+            vat_price = int((supply_price * 0.1 // 10000) * 10000) if include_vat else 0
             
             safe_write_cell(ws, r, 3, idx + 1)
             safe_write_cell(ws, r, 4, f"[{item['category']}] {item['detail']}")
