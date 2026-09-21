@@ -1,19 +1,19 @@
 import streamlit as st
 import openpyxl
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, Numbers
 import io
 from datetime import datetime
 
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 십만 원 단위 절삭** 및 **한글 금액**, **상단 원화 숫자**, **자동 줄바꿈** 처리되어 완성됩니다.")
+st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 절삭(예: 27,300,000원)** 및 **천 단위 콤마(,)**, **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------
 def num2kor(num):
-    """숫자를 정확한 한글 금액 표현으로 변환 (예: 23700000 -> 이천삼백칠십만)"""
+    """숫자를 정확한 한글 금액 표현으로 변환 (예: 27300000 -> 이천칠백삼십만)"""
     if num == 0:
         return "영"
     units = ['', '만', '억', '조']
@@ -41,7 +41,7 @@ def num2kor(num):
 def calculate_quote(items, rate, include_vat=True, cut_unit=100000):
     """
     품목 리스트, 부가세 및 총액 계산 시 
-    10만 원 미만(만 원 자리를 포함한 이하 단수)을 전부 버림(절삭) 처리 (기본 100,000원 단위)
+    만 원 이하 자리를 버려서 27,300,000원 형태로 만듦 (100,000원 단위 절삭)
     """
     if not items:
         return [], 0, 0, 0
@@ -70,8 +70,8 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=100000):
         
     return adjusted_items, supply_total, vat_total, grand_total
 
-def safe_write_cell(ws, row, col, value, wrap=False):
-    """병합 셀 에러 방지 및 자동 줄바꿈 지원 값 입력 함수"""
+def safe_write_cell(ws, row, col, value, wrap=False, is_number=False):
+    """병합 셀 에러 방지, 천 단위 콤마 서식 및 자동 줄바꿈 지원 값 입력 함수"""
     cell = ws.cell(row=row, column=col)
     target_cell = cell
     if type(cell).__name__ == 'MergedCell':
@@ -80,6 +80,10 @@ def safe_write_cell(ws, row, col, value, wrap=False):
                 target_cell = ws.cell(row=rng.min_row, column=rng.min_col)
                 break
     target_cell.value = value
+    
+    if is_number and isinstance(value, (int, float)):
+        target_cell.number_format = '#,##0'
+        
     if wrap:
         target_cell.alignment = Alignment(wrap_text=True, vertical='center')
 
@@ -93,8 +97,8 @@ ta_rate = st.sidebar.number_input("타견적서 인상률 (%)", value=10.0, step
 cut_option = st.sidebar.selectbox(
     "금액 절삭(버림) 단위 선택",
     options=[100000, 1000000, 10000, 1],
-    index=0, # 만 원 자리를 지우는 십만 원 단위 버림 기본 선택
-    format_func=lambda x: "십만 원 단위 절삭 (만 원 자리 이하를 버림 - 기본)" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else ("만 원 단위 절삭" if x == 10000 else "절삭 없음"))
+    index=0, # 만 원 이하 자리를 다 날려서 27,300,000원 형태로 만듦
+    format_func=lambda x: "만 원 이하 절삭 (예: 27,300,000원 형태 - 기본)" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else ("1천 원 이하 절삭" if x == 10000 else "절삭 없음"))
 )
 
 # ---------------------------------------------------------
@@ -167,7 +171,7 @@ ta_amts, supply_ta, vat_ta, grand_ta = calculate_quote(st.session_state["items"]
 vat_str = "(VAT 포함)" if include_vat else "(VAT 별도)"
 
 st.markdown("---")
-st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 자리 절삭 적용")
+st.subheader(f"📊 견적 금액 미리보기 [{vat_str}]")
 p_col1, p_col2, p_col3 = st.columns(3)
 
 p_col1.metric("본견적서 최종 금액", f"{grand_bon:,} 원", f"한글: {num2kor(grand_bon)}원 | 부가세: {vat_bon:,}원")
@@ -206,15 +210,15 @@ def generate_excel():
                 safe_write_cell(ws, r, 3, item["category"])
                 safe_write_cell(ws, r, 4, item["detail"], wrap=True)
                 safe_write_cell(ws, r, 5, item["spec"], wrap=True)
-                safe_write_cell(ws, r, 9, bon_amts[idx])
+                safe_write_cell(ws, r, 9, bon_amts[idx], is_number=True)
                 safe_write_cell(ws, r, 10, item["note"], wrap=True)
             
-        safe_write_cell(ws, 56, 9, vat_bon)
-        safe_write_cell(ws, 57, 9, grand_bon)
+        safe_write_cell(ws, 56, 9, vat_bon, is_number=True)
+        safe_write_cell(ws, 57, 9, grand_bon, is_number=True)
         
-        # ★ 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
+        # 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_bon))
-        safe_write_cell(ws, 21, 9, grand_bon)
+        safe_write_cell(ws, 21, 9, grand_bon, is_number=True)
 
     # 2. 가견적서 작성 (시트 2)
     if "가견적서(본견+5%)" in wb.sheetnames:
@@ -240,15 +244,15 @@ def generate_excel():
                 safe_write_cell(ws, r, 3, item["category"])
                 safe_write_cell(ws, r, 4, item["detail"], wrap=True)
                 safe_write_cell(ws, r, 5, item["spec"], wrap=True)
-                safe_write_cell(ws, r, 9, ga_amts[idx])
+                safe_write_cell(ws, r, 9, ga_amts[idx], is_number=True)
                 safe_write_cell(ws, r, 10, item["note"], wrap=True)
             
-        safe_write_cell(ws, 55, 9, vat_ga)
-        safe_write_cell(ws, 56, 9, grand_ga)
+        safe_write_cell(ws, 55, 9, vat_ga, is_number=True)
+        safe_write_cell(ws, 56, 9, grand_ga, is_number=True)
         
-        # ★ 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
+        # 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_ga))
-        safe_write_cell(ws, 21, 9, grand_ga)
+        safe_write_cell(ws, 21, 9, grand_ga, is_number=True)
 
     # 3. 타견적서 작성 (시트 3)
     if "타견적서(본견+10%)" in wb.sheetnames:
@@ -277,17 +281,17 @@ def generate_excel():
                 safe_write_cell(ws, r, 3, idx + 1)
                 safe_write_cell(ws, r, 4, f"[{item['category']}] {item['detail']}", wrap=True)
                 safe_write_cell(ws, r, 5, item["spec"], wrap=True)
-                safe_write_cell(ws, r, 7, supply_price)
-                safe_write_cell(ws, r, 8, vat_price)
+                safe_write_cell(ws, r, 7, supply_price, is_number=True)
+                safe_write_cell(ws, r, 8, vat_price, is_number=True)
                 safe_write_cell(ws, r, 9, item["note"], wrap=True)
             
-        safe_write_cell(ws, 52, 7, supply_ta)
-        safe_write_cell(ws, 53, 7, vat_ta)
-        safe_write_cell(ws, 54, 7, grand_ta)
+        safe_write_cell(ws, 52, 7, supply_ta, is_number=True)
+        safe_write_cell(ws, 53, 7, vat_ta, is_number=True)
+        safe_write_cell(ws, 54, 7, grand_ta, is_number=True)
         
-        # ★ 상단 한글 금액 표기(D17) 및 (\₩ ) 옆 숫자 표기(H17)
+        # 상단 한글 금액 표기(D17) 및 (\₩ ) 옆 숫자 표기(H17)
         safe_write_cell(ws, 17, 4, num2kor(grand_ta))
-        safe_write_cell(ws, 17, 8, grand_ta)
+        safe_write_cell(ws, 17, 8, grand_ta, is_number=True)
 
     output = io.BytesIO()
     wb.save(output)
