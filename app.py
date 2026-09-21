@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 십만 원 단위 절삭** 및 **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
+st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 십만 원 단위 절삭** 및 **한글 금액**, **상단 원화 숫자**, **자동 줄바꿈** 처리되어 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
@@ -211,7 +211,10 @@ def generate_excel():
             
         safe_write_cell(ws, 56, 9, vat_bon)
         safe_write_cell(ws, 57, 9, grand_bon)
+        
+        # ★ 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_bon))
+        safe_write_cell(ws, 21, 9, grand_bon)
 
     # 2. 가견적서 작성 (시트 2)
     if "가견적서(본견+5%)" in wb.sheetnames:
@@ -242,7 +245,10 @@ def generate_excel():
             
         safe_write_cell(ws, 55, 9, vat_ga)
         safe_write_cell(ws, 56, 9, grand_ga)
+        
+        # ★ 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_ga))
+        safe_write_cell(ws, 21, 9, grand_ga)
 
     # 3. 타견적서 작성 (시트 3)
     if "타견적서(본견+10%)" in wb.sheetnames:
@@ -278,7 +284,10 @@ def generate_excel():
         safe_write_cell(ws, 52, 7, supply_ta)
         safe_write_cell(ws, 53, 7, vat_ta)
         safe_write_cell(ws, 54, 7, grand_ta)
+        
+        # ★ 상단 한글 금액 표기(D17) 및 (\₩ ) 옆 숫자 표기(H17)
         safe_write_cell(ws, 17, 4, num2kor(grand_ta))
+        safe_write_cell(ws, 17, 8, grand_ta)
 
     output = io.BytesIO()
     wb.save(output)
