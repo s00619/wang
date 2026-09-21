@@ -1,12 +1,13 @@
 import streamlit as st
 import openpyxl
+from openpyxl.styles import Alignment
 import io
 from datetime import datetime
 
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**가 **1만 원 이하 금액이 절삭(버림)**되어 자동으로 완성됩니다.")
+st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 십만 원 단위 절삭** 및 **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
@@ -39,8 +40,8 @@ def num2kor(num):
 
 def calculate_quote(items, rate, include_vat=True, cut_unit=100000):
     """
-    품목 리스트, 부가세 계산 및 총액까지 
-    1만 원 이하 단위(1만, 1천, 1백 원...)를 전부 0으로 버림(절삭) 처리 (예: 23,700,000원)
+    품목 리스트, 부가세 및 총액 계산 시 
+    10만 원 미만(만 원 자리를 포함한 이하 단수)을 전부 버림(절삭) 처리 (기본 100,000원 단위)
     """
     if not items:
         return [], 0, 0, 0
@@ -69,16 +70,18 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=100000):
         
     return adjusted_items, supply_total, vat_total, grand_total
 
-def safe_write_cell(ws, row, col, value):
-    """병합 셀 에러 방지를 위한 안전한 값 입력 함수"""
+def safe_write_cell(ws, row, col, value, wrap=False):
+    """병합 셀 에러 방지 및 자동 줄바꿈 지원 값 입력 함수"""
     cell = ws.cell(row=row, column=col)
+    target_cell = cell
     if type(cell).__name__ == 'MergedCell':
         for rng in ws.merged_cells.ranges:
             if cell.coordinate in rng:
-                ws.cell(row=rng.min_row, column=rng.min_col, value=value)
-                return
-    else:
-        cell.value = value
+                target_cell = ws.cell(row=rng.min_row, column=rng.min_col)
+                break
+    target_cell.value = value
+    if wrap:
+        target_cell.alignment = Alignment(wrap_text=True, vertical='center')
 
 # ---------------------------------------------------------
 # Sidebar Settings
@@ -90,8 +93,8 @@ ta_rate = st.sidebar.number_input("타견적서 인상률 (%)", value=10.0, step
 cut_option = st.sidebar.selectbox(
     "금액 절삭(버림) 단위 선택",
     options=[100000, 1000000, 10000, 1],
-    index=0, # 10만원 단위 버림 (1만원 이하 자리를 다 날림) 기본 선택
-    format_func=lambda x: "1만 원 이하 절삭 (예: 2,370만 원 형태 - 기본)" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else ("1천 원 이하 절삭" if x == 10000 else "절삭 없음"))
+    index=0, # 만 원 자리를 지우는 십만 원 단위 버림 기본 선택
+    format_func=lambda x: "십만 원 단위 절삭 (만 원 자리 이하를 버림 - 기본)" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else ("만 원 단위 절삭" if x == 10000 else "절삭 없음"))
 )
 
 # ---------------------------------------------------------
@@ -116,15 +119,16 @@ with col1:
     client_name = st.text_input("발주처 (회사/기관명)", value="사단법인 커뮤니티와경제")
     project_name = st.text_input("용역명 (사업명)", value="2026년 사회적경제 활성화 지원 사업")
     issue_date = st.date_input("발행일자", datetime.today())
-    manager_name = st.text_input("담당자 성명", value="강은경")
+    manager_name = st.text_input("담당자 성명", value="이주영")
 
 with col2:
     st.subheader("📂 템플릿 파일")
     uploaded_file = st.file_uploader("견적서 양식 엑셀 파일 (.xlsx)", type=["xlsx"])
-    st.caption("※ 업로드하지 않으면 기본 양식을 사용합니다.")
+    st.caption("※ 업로드하지 않으면 새로 수정된 확장 템플릿 양식을 기본으로 사용합니다.")
 
 st.divider()
 st.subheader("💡 본견적서 항목 작성 (공급가액 기준)")
+st.caption("※ 산출내역이나 내용 입력 시 Shift+Enter로 줄바꿈을 입력할 수 있습니다.")
 
 if "items" not in st.session_state:
     st.session_state["items"] = [
@@ -142,8 +146,8 @@ def remove_item(idx):
 for idx, item in enumerate(st.session_state["items"]):
     cols = st.columns([2, 3, 3, 2, 2, 1])
     item["category"] = cols[0].text_input(f"지출구분 #{idx+1}", item["category"], key=f"cat_{idx}")
-    item["detail"] = cols[1].text_input(f"내용 #{idx+1}", item["detail"], key=f"det_{idx}")
-    item["spec"] = cols[2].text_input(f"산출내역 #{idx+1}", item["spec"], key=f"spec_{idx}")
+    item["detail"] = cols[1].text_area(f"내용 #{idx+1}", item["detail"], key=f"det_{idx}", height=68)
+    item["spec"] = cols[2].text_area(f"산출내역 #{idx+1}", item["spec"], key=f"spec_{idx}", height=68)
     item["amount"] = cols[3].number_input(f"금액(원) #{idx+1}", value=int(item["amount"]), step=100000, key=f"amt_{idx}")
     item["note"] = cols[4].text_input(f"비고 #{idx+1}", item["note"], key=f"note_{idx}")
     
@@ -163,7 +167,7 @@ ta_amts, supply_ta, vat_ta, grand_ta = calculate_quote(st.session_state["items"]
 vat_str = "(VAT 포함)" if include_vat else "(VAT 별도)"
 
 st.markdown("---")
-st.subheader(f"📊 견적 금액 미리보기 [{vat_str}]")
+st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 자리 절삭 적용")
 p_col1, p_col2, p_col3 = st.columns(3)
 
 p_col1.metric("본견적서 최종 금액", f"{grand_bon:,} 원", f"한글: {num2kor(grand_bon)}원 | 부가세: {vat_bon:,}원")
@@ -171,10 +175,10 @@ p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 금액", f"{grand_ga:,} 원", 
 p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 금액", f"{grand_ta:,} 원", f"한글: {num2kor(grand_ta)}원 | 부가세: {vat_ta:,}원")
 
 # ---------------------------------------------------------
-# Excel Generation Logic
+# Excel Generation Logic (확장 템플릿 지원)
 # ---------------------------------------------------------
 def generate_excel():
-    template_path = "본,가,타견적서 양식_본_가_타.xlsx" if uploaded_file is None else uploaded_file
+    template_path = "통합 견적서 자동 생성 에이전트 템플릿 파일.xlsx" if uploaded_file is None else uploaded_file
     wb = openpyxl.load_workbook(template_path)
     
     # 1. 본견적서 작성 (시트 1)
@@ -183,22 +187,30 @@ def generate_excel():
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
         safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
-        safe_write_cell(ws, 14, 9, manager_name)
+        safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
         
         start_row = 26
+        # 기존 품목 영역 초기화 (Row 26 ~ 55)
+        for r in range(start_row, 56):
+            safe_write_cell(ws, r, 3, None)
+            safe_write_cell(ws, r, 4, None)
+            safe_write_cell(ws, r, 5, None)
+            safe_write_cell(ws, r, 9, None)
+            safe_write_cell(ws, r, 10, None)
+            
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            safe_write_cell(ws, r, 3, item["category"])
-            safe_write_cell(ws, r, 4, item["detail"])
-            safe_write_cell(ws, r, 5, item["spec"])
-            safe_write_cell(ws, r, 9, bon_amts[idx])
-            safe_write_cell(ws, r, 10, item["note"])
+            if r < 56:
+                safe_write_cell(ws, r, 3, item["category"])
+                safe_write_cell(ws, r, 4, item["detail"], wrap=True)
+                safe_write_cell(ws, r, 5, item["spec"], wrap=True)
+                safe_write_cell(ws, r, 9, bon_amts[idx])
+                safe_write_cell(ws, r, 10, item["note"], wrap=True)
             
-        safe_write_cell(ws, 41, 9, vat_bon)
-        safe_write_cell(ws, 42, 9, grand_bon)
-        # 본견적서 상단 한글 금액 표기 (D21)
+        safe_write_cell(ws, 56, 9, vat_bon)
+        safe_write_cell(ws, 57, 9, grand_bon)
         safe_write_cell(ws, 21, 4, num2kor(grand_bon))
 
     # 2. 가견적서 작성 (시트 2)
@@ -207,22 +219,29 @@ def generate_excel():
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
         safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
-        safe_write_cell(ws, 14, 9, manager_name)
+        safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
         
         start_row = 26
+        for r in range(start_row, 55):
+            safe_write_cell(ws, r, 3, None)
+            safe_write_cell(ws, r, 4, None)
+            safe_write_cell(ws, r, 5, None)
+            safe_write_cell(ws, r, 9, None)
+            safe_write_cell(ws, r, 10, None)
+
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            safe_write_cell(ws, r, 3, item["category"])
-            safe_write_cell(ws, r, 4, item["detail"])
-            safe_write_cell(ws, r, 5, item["spec"])
-            safe_write_cell(ws, r, 9, ga_amts[idx])
-            safe_write_cell(ws, r, 10, item["note"])
+            if r < 55:
+                safe_write_cell(ws, r, 3, item["category"])
+                safe_write_cell(ws, r, 4, item["detail"], wrap=True)
+                safe_write_cell(ws, r, 5, item["spec"], wrap=True)
+                safe_write_cell(ws, r, 9, ga_amts[idx])
+                safe_write_cell(ws, r, 10, item["note"], wrap=True)
             
-        safe_write_cell(ws, 41, 9, vat_ga)
-        safe_write_cell(ws, 42, 9, grand_ga)
-        # 가견적서 상단 한글 금액 표기 (D21)
+        safe_write_cell(ws, 55, 9, vat_ga)
+        safe_write_cell(ws, 56, 9, grand_ga)
         safe_write_cell(ws, 21, 4, num2kor(grand_ga))
 
     # 3. 타견적서 작성 (시트 3)
@@ -236,22 +255,29 @@ def generate_excel():
         safe_write_cell(ws, 18, 4, project_name)
         
         start_row = 23
+        for r in range(start_row, 52):
+            safe_write_cell(ws, r, 4, None)
+            safe_write_cell(ws, r, 5, None)
+            safe_write_cell(ws, r, 7, None)
+            safe_write_cell(ws, r, 8, None)
+            safe_write_cell(ws, r, 9, None)
+
         for idx, item in enumerate(st.session_state["items"]):
             r = start_row + idx
-            supply_price = ta_amts[idx]
-            vat_price = int((supply_price * 0.1 // cut_option) * cut_option) if include_vat else 0
+            if r < 52:
+                supply_price = ta_amts[idx]
+                vat_price = int((supply_price * 0.1 // cut_option) * cut_option) if include_vat else 0
+                
+                safe_write_cell(ws, r, 3, idx + 1)
+                safe_write_cell(ws, r, 4, f"[{item['category']}] {item['detail']}", wrap=True)
+                safe_write_cell(ws, r, 5, item["spec"], wrap=True)
+                safe_write_cell(ws, r, 7, supply_price)
+                safe_write_cell(ws, r, 8, vat_price)
+                safe_write_cell(ws, r, 9, item["note"], wrap=True)
             
-            safe_write_cell(ws, r, 3, idx + 1)
-            safe_write_cell(ws, r, 4, f"[{item['category']}] {item['detail']}")
-            safe_write_cell(ws, r, 5, item["spec"])
-            safe_write_cell(ws, r, 7, supply_price)
-            safe_write_cell(ws, r, 8, vat_price)
-            safe_write_cell(ws, r, 9, item["note"])
-            
-        safe_write_cell(ws, 38, 7, supply_ta)
-        safe_write_cell(ws, 39, 7, vat_ta)
-        safe_write_cell(ws, 40, 7, grand_ta)
-        # 타견적서 상단 한글 금액 표기 (D17)
+        safe_write_cell(ws, 52, 7, supply_ta)
+        safe_write_cell(ws, 53, 7, vat_ta)
+        safe_write_cell(ws, 54, 7, grand_ta)
         safe_write_cell(ws, 17, 4, num2kor(grand_ta))
 
     output = io.BytesIO()
