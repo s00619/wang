@@ -1,13 +1,13 @@
 import streamlit as st
 import openpyxl
-from openpyxl.styles import Alignment, Numbers
+from openpyxl.styles import Alignment
 import io
 from datetime import datetime
 
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 자리가 지워진 절삭(예: 27,300,000원)** 및 **천 단위 콤마(,)**, **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
+st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **절삭(예: 27,300,000원)** 및 **천 단위 콤마(,)**, **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
