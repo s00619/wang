@@ -6,13 +6,13 @@ from datetime import datetime
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **만 원 단위 절삭** 및 **한글 금액**으로 자동 완성됩니다.")
+st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**가 만 원 자리가 지워진 **십만 원 단위 절삭** 및 **한글 금액**으로 자동 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------
 def num2kor(num):
-    """숫자를 정확한 한글 금액 표현으로 변환 (예: 12340000 -> 천이백삼십사만)"""
+    """숫자를 정확한 한글 금액 표현으로 변환 (예: 23600000 -> 이천삼백육십만)"""
     if num == 0:
         return "영"
     units = ['', '만', '억', '조']
@@ -37,10 +37,10 @@ def num2kor(num):
         
     return "".join(reversed(result))
 
-def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
+def calculate_quote(items, rate, include_vat=True, cut_unit=100000):
     """
     품목 리스트, 부가세 계산 및 총액까지 
-    모든 단계에서 만 원 단위(10,000원) 미만 단수를 완벽히 버림(절삭) 처리
+    모든 단계에서 cut_unit(기본 100,000원 - 만 원 자리 이하) 버림(절삭) 처리
     """
     if not items:
         return [], 0, 0, 0
@@ -58,7 +58,6 @@ def calculate_quote(items, rate, include_vat=True, cut_unit=10000):
     
     if include_vat:
         raw_vat = supply_total * 0.1
-        # VAT 자체도 만 원 단위 미만 절삭(버림)
         if cut_unit > 1:
             vat_total = int((raw_vat // cut_unit) * cut_unit)
         else:
@@ -90,9 +89,9 @@ ta_rate = st.sidebar.number_input("타견적서 인상률 (%)", value=10.0, step
 
 cut_option = st.sidebar.selectbox(
     "금액 절삭(버림) 단위 선택",
-    options=[10000, 100000, 1000000, 1],
-    index=0, # 만 원 단위 기본 선택
-    format_func=lambda x: "만 원 단위 절삭 (몇백 몇십만 원으로 정돈)" if x == 10000 else ("십만 원 단위 절삭" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else "절삭 없음"))
+    options=[100000, 1000000, 10000, 1],
+    index=0, # 십만 원 단위 (만 원 자리를 지움) 기본 선택
+    format_func=lambda x: "십만 원 단위 절삭 (만 원 자리를 지움 - 기본)" if x == 100000 else ("백만 원 단위 절삭" if x == 1000000 else ("만 원 단위 절삭" if x == 10000 else "절삭 없음"))
 )
 
 # ---------------------------------------------------------
@@ -145,7 +144,7 @@ for idx, item in enumerate(st.session_state["items"]):
     item["category"] = cols[0].text_input(f"지출구분 #{idx+1}", item["category"], key=f"cat_{idx}")
     item["detail"] = cols[1].text_input(f"내용 #{idx+1}", item["detail"], key=f"det_{idx}")
     item["spec"] = cols[2].text_input(f"산출내역 #{idx+1}", item["spec"], key=f"spec_{idx}")
-    item["amount"] = cols[3].number_input(f"금액(원) #{idx+1}", value=int(item["amount"]), step=10000, key=f"amt_{idx}")
+    item["amount"] = cols[3].number_input(f"금액(원) #{idx+1}", value=int(item["amount"]), step=100000, key=f"amt_{idx}")
     item["note"] = cols[4].text_input(f"비고 #{idx+1}", item["note"], key=f"note_{idx}")
     
     if cols[5].button("❌", key=f"del_{idx}"):
@@ -164,12 +163,12 @@ ta_amts, supply_ta, vat_ta, grand_ta = calculate_quote(st.session_state["items"]
 vat_str = "(VAT 포함)" if include_vat else "(VAT 별도)"
 
 st.markdown("---")
-st.subheader(f"📊 견적 금액 미리보기 [{vat_str}] - 만 원 단위 절삭 적용")
+st.subheader(f"📊 견적 금액 미리보기 [{vat_str}]")
 p_col1, p_col2, p_col3 = st.columns(3)
 
-p_col1.metric("본견적서 최종 금액", f"{grand_bon:,} 원", f"한글: {num2kor(grand_bon)}만 원 | 부가세: {vat_bon:,}원")
-p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 금액", f"{grand_ga:,} 원", f"한글: {num2kor(grand_ga)}만 원 | 부가세: {vat_ga:,}원")
-p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 금액", f"{grand_ta:,} 원", f"한글: {num2kor(grand_ta)}만 원 | 부가세: {vat_ta:,}원")
+p_col1.metric("본견적서 최종 금액", f"{grand_bon:,} 원", f"한글: {num2kor(grand_bon)}원 | 부가세: {vat_bon:,}원")
+p_col2.metric(f"가견적서 (+{ga_rate}%) 최종 금액", f"{grand_ga:,} 원", f"한글: {num2kor(grand_ga)}원 | 부가세: {vat_ga:,}원")
+p_col3.metric(f"타견적서 (+{ta_rate}%) 최종 금액", f"{grand_ta:,} 원", f"한글: {num2kor(grand_ta)}원 | 부가세: {vat_ta:,}원")
 
 # ---------------------------------------------------------
 # Excel Generation Logic
@@ -262,7 +261,7 @@ def generate_excel():
 
 st.divider()
 
-if st.button("🚀 만 원 단위 절삭 견적서 3종 엑셀 파일 생성하기", type="primary", use_container_width=True):
+if st.button("🚀 견적서 3종 엑셀 파일 생성하기", type="primary", use_container_width=True):
     excel_data = generate_excel()
     file_name = f"통합견적서_{project_name}_{issue_date.strftime('%Y%m%d')}.xlsx"
     st.download_button(
