@@ -104,9 +104,9 @@ cut_option = st.sidebar.selectbox(
 # ---------------------------------------------------------
 # Main Options & Form Inputs
 # ---------------------------------------------------------
-st.subheader("⚙️ VAT 적용 옵션 선택")
+st.subheader("🐱 VAT 적용 옵션 선택 🐱")
 include_vat_option = st.radio(
-    "VAT(부가가치세) 계산 방식을 선택하세요:",
+    "💡 VAT(부가가치세) 계산 방식을 선택하세요 :",
     options=["VAT 포함 (공급가액 + 10% 부가세 자동 합산)", "VAT 별도/미포함 (부가세 계산 안 함)"],
     index=0,
     horizontal=True
