@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
 
 st.title("📄 통합 견적서 자동 생성 에이전트")
-st.markdown("기본 정보와 본견적서 내용만 입력하면 **본견적서**, **가견적서(+5%)**, **타견적서(+10%)**의 모든 금액이 **절삭(예: 27,300,000원)** 및 **천 단위 콤마(,)**, **한글 금액**, **자동 줄바꿈** 처리되어 완성됩니다.")
+st.markdown("💡 본견적서를 작성하면 가견적서(+5%)와 타견적서(+10%)가 자동 계산되어 견적서 3종 엑셀 파일로 완성됩니다.")
 
 # ---------------------------------------------------------
 # Helper Functions
@@ -120,10 +120,11 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📌 기본 정보")
-    client_name = st.text_input("발주처 (회사/기관명)", value="사단법인 커뮤니티와경제")
-    project_name = st.text_input("용역명 (사업명)", value="2026년 사회적경제 활성화 지원 사업")
+    # ★ 요청사항 반영: 발주처, 용역명, 담당자 입력칸 초기 비움 처리
+    client_name = st.text_input("발주처 (회사/기관명)", value="", placeholder="발주처 입력")
+    project_name = st.text_input("용역명 (사업명)", value="", placeholder="용역명 입력")
     issue_date = st.date_input("발행일자", datetime.today())
-    manager_name = st.text_input("담당자 성명", value="이주영")
+    manager_name = st.text_input("담당자 성명", value="", placeholder="담당자 성명 입력")
 
 with col2:
     st.subheader("📂 템플릿 파일")
@@ -136,8 +137,7 @@ st.caption("※ 산출내역이나 내용 입력 시 Shift+Enter로 줄바꿈을
 
 if "items" not in st.session_state:
     st.session_state["items"] = [
-        {"category": "인건비", "detail": "연구원 인건비", "spec": "2명 * 3개월", "amount": 20000000, "note": ""},
-        {"category": "경비", "detail": "회의비 및 임차료", "spec": "장소 대여 2회", "amount": 10000000, "note": ""}
+        {"category": "", "detail": "", "spec": "", "amount": 0, "note": ""}
     ]
 
 def add_item():
@@ -185,12 +185,15 @@ def generate_excel():
     template_path = "통합 견적서 자동 생성 에이전트 템플릿 파일.xlsx" if uploaded_file is None else uploaded_file
     wb = openpyxl.load_workbook(template_path)
     
+    # YYYY/MM/DD 포맷 날짜 문자열
+    formatted_date = issue_date.strftime("%Y/%m/%d")
+    
     # 1. 본견적서 작성 (시트 1)
     if "본견적서" in wb.sheetnames:
         ws = wb["본견적서"]
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
-        safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 14, 4, formatted_date) # YYYY/MM/DD 세팅
         safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
@@ -225,7 +228,7 @@ def generate_excel():
         ws = wb["가견적서(본견+5%)"]
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
-        safe_write_cell(ws, 14, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 14, 4, formatted_date) # YYYY/MM/DD 세팅
         safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
@@ -260,7 +263,7 @@ def generate_excel():
         safe_write_cell(ws, 3, 4, None)
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 10, 4, client_name)
-        safe_write_cell(ws, 12, 4, issue_date.strftime("%Y-%m-%d"))
+        safe_write_cell(ws, 12, 4, formatted_date) # YYYY/MM/DD 세팅
         safe_write_cell(ws, 12, 9, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         
@@ -302,7 +305,7 @@ st.divider()
 
 if st.button("🚀 견적서 3종 엑셀 파일 생성하기", type="primary", use_container_width=True):
     excel_data = generate_excel()
-    file_name = f"통합견적서_{project_name}_{issue_date.strftime('%Y%m%d')}.xlsx"
+    file_name = f"통합견적서_{project_name if project_name else '견적서'}_{issue_date.strftime('%Y%m%d')}.xlsx"
     st.download_button(
         label="📥 생성된 엑셀 파일 다운로드",
         data=excel_data,
