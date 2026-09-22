@@ -4,9 +4,9 @@ from openpyxl.styles import Alignment
 import io
 from datetime import datetime
 
-st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="📄")
+st.set_page_config(page_title="자동 견적서 생성 에이전트", layout="wide", page_icon="❤️")
 
-st.title("📄 통합 견적서 자동 생성 에이전트")
+st.title("❤️ 통합 견적서 자동 생성 에이전트 ❤️")
 st.markdown("💡 본견적서를 작성하면 가견적서(+5%)와 타견적서(+10%)가 자동 계산되어 견적서 3종 엑셀 파일로 완성됩니다.")
 
 # ---------------------------------------------------------
@@ -120,7 +120,6 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📌 기본 정보")
-    # ★ 요청사항 반영: 발주처, 용역명, 담당자 입력칸 초기 비움 처리
     client_name = st.text_input("발주처 (회사/기관명)", value="", placeholder="발주처 입력")
     project_name = st.text_input("용역명 (사업명)", value="", placeholder="용역명 입력")
     issue_date = st.date_input("발행일자", datetime.today())
@@ -185,7 +184,6 @@ def generate_excel():
     template_path = "통합 견적서 자동 생성 에이전트 템플릿 파일.xlsx" if uploaded_file is None else uploaded_file
     wb = openpyxl.load_workbook(template_path)
     
-    # YYYY/MM/DD 포맷 날짜 문자열
     formatted_date = issue_date.strftime("%Y/%m/%d")
     
     # 1. 본견적서 작성 (시트 1)
@@ -193,13 +191,12 @@ def generate_excel():
         ws = wb["본견적서"]
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
-        safe_write_cell(ws, 14, 4, formatted_date) # YYYY/MM/DD 세팅
+        safe_write_cell(ws, 14, 4, formatted_date)
         safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
         
         start_row = 26
-        # 기존 품목 영역 초기화 (Row 26 ~ 55)
         for r in range(start_row, 56):
             safe_write_cell(ws, r, 3, None)
             safe_write_cell(ws, r, 4, None)
@@ -219,7 +216,6 @@ def generate_excel():
         safe_write_cell(ws, 56, 9, vat_bon, is_number=True)
         safe_write_cell(ws, 57, 9, grand_bon, is_number=True)
         
-        # 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_bon))
         safe_write_cell(ws, 21, 9, grand_bon, is_number=True)
 
@@ -228,7 +224,7 @@ def generate_excel():
         ws = wb["가견적서(본견+5%)"]
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 12, 4, client_name)
-        safe_write_cell(ws, 14, 4, formatted_date) # YYYY/MM/DD 세팅
+        safe_write_cell(ws, 14, 4, formatted_date)
         safe_write_cell(ws, 14, 10, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         safe_write_cell(ws, 21, 7, "(부가세 포함)" if include_vat else "(부가세 별도)")
@@ -253,7 +249,6 @@ def generate_excel():
         safe_write_cell(ws, 55, 9, vat_ga, is_number=True)
         safe_write_cell(ws, 56, 9, grand_ga, is_number=True)
         
-        # 상단 한글 금액 표기(D21) 및 (\₩ ) 옆 숫자 표기(I21)
         safe_write_cell(ws, 21, 4, num2kor(grand_ga))
         safe_write_cell(ws, 21, 9, grand_ga, is_number=True)
 
@@ -263,7 +258,7 @@ def generate_excel():
         safe_write_cell(ws, 3, 4, None)
         safe_write_cell(ws, 7, 3, client_name)
         safe_write_cell(ws, 10, 4, client_name)
-        safe_write_cell(ws, 12, 4, formatted_date) # YYYY/MM/DD 세팅
+        safe_write_cell(ws, 12, 4, formatted_date)
         safe_write_cell(ws, 12, 9, manager_name)
         safe_write_cell(ws, 18, 4, project_name)
         
@@ -292,7 +287,6 @@ def generate_excel():
         safe_write_cell(ws, 53, 7, vat_ta, is_number=True)
         safe_write_cell(ws, 54, 7, grand_ta, is_number=True)
         
-        # 상단 한글 금액 표기(D17) 및 (\₩ ) 옆 숫자 표기(H17)
         safe_write_cell(ws, 17, 4, num2kor(grand_ta))
         safe_write_cell(ws, 17, 8, grand_ta, is_number=True)
 
